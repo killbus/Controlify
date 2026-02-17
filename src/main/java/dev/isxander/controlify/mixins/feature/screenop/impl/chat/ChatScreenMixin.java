@@ -126,21 +126,13 @@ public abstract class ChatScreenMixin extends Screen implements ScreenProcessorP
 
     @Override
     public boolean controlify$acceptKeyCode(int keycode, int scancode, int modifiers) {
-        boolean bypassInput = List.of(
-                InputConstants.KEY_RETURN,
-                InputConstants.KEY_ESCAPE
-        ).contains(keycode);
-
         //? if >=1.21.9 {
         Predicate<GuiEventListener> keyPress = listener -> listener.keyPressed(new net.minecraft.client.input.KeyEvent(keycode, scancode, modifiers));
         //?} else {
         /*Predicate<GuiEventListener> keyPress = listener -> listener.keyPressed(keycode, scancode, modifiers);
         *///?}
 
-        if (bypassInput) {
-            return keyPress.test((ChatScreen) (Object) this);
-        }
-        return keyPress.test(this.input);
+        return keyPress.test((ChatScreen) (Object) this);
     }
 
     @Override
