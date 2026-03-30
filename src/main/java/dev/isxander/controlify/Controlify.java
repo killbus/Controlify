@@ -20,6 +20,7 @@ import dev.isxander.controlify.bindings.defaults.DefaultBindManager;
 import dev.isxander.controlify.compatibility.ControlifyCompat;
 import dev.isxander.controlify.config.ConfigManager;
 import dev.isxander.controlify.config.dto.profile.defaults.DefaultConfigManager;
+import dev.isxander.controlify.config.settings.GlobalSettings;
 import dev.isxander.controlify.config.settings.device.DeviceSettings;
 import dev.isxander.controlify.config.settings.profile.ProfileSettings;
 import dev.isxander.controlify.contextual.ContextualDomains;
@@ -366,7 +367,13 @@ public class Controlify implements ControlifyApi {
 		config().markDirty();
 
 		String selectedUid = config().getActiveProfile().controllerUid;
-		if (selectedUid == null || selectedUid.equals(controller.uid())) {
+		GlobalSettings globalSettings = config().getSettings().globalSettings();
+		if (selectedUid == null) {
+			// when auto-switching is disabled, only the preferred controller grabs focus on connection
+			if (globalSettings.autoSwitchControllers || controller.uid().equals(globalSettings.preferredControllerUid)) {
+				this.setCurrentController(controller, true);
+			}
+		} else if (selectedUid.equals(controller.uid())) {
 			this.setCurrentController(controller, true);
 		}
 
@@ -556,7 +563,8 @@ public class Controlify implements ControlifyApi {
 	}
 
 	private void tickInactiveController(ControllerEntity controller) {
-		if (config().getActiveProfile().controllerUid != null) {
+		if (config().getActiveProfile().controllerUid != null
+				|| !config().getSettings().globalSettings().autoSwitchControllers) {
 			return;
 		}
 
@@ -573,11 +581,29 @@ public class Controlify implements ControlifyApi {
 
 	public void applyControllerSelection(boolean changeInputMode) {
 		String selectedUid = config().getActiveProfile().controllerUid;
-		Optional<ControllerEntity> selected = controllerManager == null
-				? Optional.empty()
-				: controllerManager.getConnectedControllers().stream()
-						.filter(controller -> selectedUid == null || selectedUid.equals(controller.uid()))
+		GlobalSettings globalSettings = config().getSettings().globalSettings();
+		Optional<ControllerEntity> selected = Optional.empty();
+
+		if (controllerManager != null) {
+			if (selectedUid != null) {
+				// a locked profile stays in keyboard mode whilst its controller is disconnected
+				selected = controllerManager.getConnectedControllers().stream()
+						.filter(controller -> selectedUid.equals(controller.uid()))
 						.findFirst();
+			} else {
+				// with auto-switching disabled, the preferred controller takes priority
+				if (!globalSettings.autoSwitchControllers) {
+					selected = controllerManager.getConnectedControllers().stream()
+							.filter(controller -> controller.uid().equals(globalSettings.preferredControllerUid))
+							.findFirst();
+				}
+				// fall back to the first connected controller
+				if (selected.isEmpty()) {
+					selected = controllerManager.getConnectedControllers().stream().findFirst();
+				}
+			}
+		}
+
 		this.setCurrentController(selected.orElse(null), changeInputMode);
 	}
 

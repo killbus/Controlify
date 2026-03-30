@@ -9,6 +9,7 @@ package dev.isxander.controlify.gui.screen;
 import dev.isxander.controlify.Controlify;
 import dev.isxander.controlify.api.ControlifyApi;
 import dev.isxander.controlify.config.settings.GlobalSettings;
+import dev.isxander.controlify.config.settings.device.DeviceSettings;
 import dev.isxander.controlify.controller.ControllerEntity;
 import dev.isxander.controlify.driver.steamdeck.SteamDeckUtil;
 import dev.isxander.controlify.reacharound.ReachAroundMode;
@@ -27,12 +28,31 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class GlobalSettingsScreenFactory {
 	public static Screen createGlobalSettingsScreen(Screen parent) {
 		var globalSettings = Controlify.instance().config().getSettings().globalSettings();
 		AtomicReference<ListOption<String>> analogueMovementWhitelist = new AtomicReference<>();
+		AtomicReference<Option<String>> controllerSelector = new AtomicReference<>();
+
+		// an empty uid represents "automatic", falling back to the first connected controller
+		Map<String, DeviceSettings> devices = Controlify.instance().config().getSettings().deviceSettings();
+		List<String> controllerUids = devices.entrySet().stream()
+				.sorted(Map.Entry.<String, DeviceSettings>comparingByValue(
+						Comparator.comparingLong(device -> device.lastSeen)
+				).reversed())
+				.map(Map.Entry::getKey)
+				.collect(Collectors.toCollection(ArrayList::new));
+		if (!globalSettings.preferredControllerUid.isEmpty() && !controllerUids.contains(globalSettings.preferredControllerUid)) {
+			controllerUids.add(globalSettings.preferredControllerUid);
+		}
+		controllerUids.addFirst("");
 
 		return YetAnotherConfigLib.createBuilder()
 				.title(Component.translatable("controlify.gui.global_settings.title"))
@@ -190,6 +210,49 @@ public class GlobalSettingsScreenFactory {
 											Minecraft.getInstance().keyboardHandler.setClipboard(formatted);
 										})
 										.build())
+								.build())
+						.group(OptionGroup.createBuilder()
+								.name(Component.translatable("controlify.gui.controller_selection.global"))
+								.option(Option.<Boolean>createBuilder()
+										.name(Component.translatable("controlify.gui.auto_switch_controllers"))
+										.description(OptionDescription.createBuilder()
+												.text(Component.translatable("controlify.gui.auto_switch_controllers.tooltip"))
+												.build())
+										.binding(GlobalSettings.defaults().autoSwitchControllers, () -> globalSettings.autoSwitchControllers, v -> globalSettings.autoSwitchControllers = v)
+										.controller(TickBoxControllerBuilder::create)
+										.addListener((opt, event) -> {
+											var selector = controllerSelector.get();
+											if (selector != null) selector.setAvailable(!opt.pendingValue());
+										})
+										.build())
+								.option(() -> {
+									// an empty uid represents "automatic": the first connected
+									// controller is selected, and hotplugs do not steal focus
+									var opt = Option.<String>createBuilder()
+											.name(Component.translatable("controlify.gui.preferred_controller"))
+											.description(OptionDescription.createBuilder()
+													.text(Component.translatable("controlify.gui.preferred_controller.tooltip"))
+													.build())
+											.binding(GlobalSettings.defaults().preferredControllerUid, () -> globalSettings.preferredControllerUid, uid -> {
+												globalSettings.preferredControllerUid = uid;
+												if (!globalSettings.autoSwitchControllers) {
+													Controlify.instance().applyControllerSelection(true);
+												}
+											})
+											.controller(o -> CyclingListControllerBuilder.create(o)
+													.values(controllerUids)
+													.formatValue(uid -> {
+														if (uid.isEmpty()) {
+															return Component.translatable("controlify.gui.controller_selection.automatic");
+														}
+														DeviceSettings device = devices.get(uid);
+														return Component.literal(device == null || device.name.isBlank() ? uid : device.name);
+													}))
+											.available(!globalSettings.autoSwitchControllers)
+											.build();
+									controllerSelector.set(opt);
+									return opt;
+								})
 								.build())
 						.build())
 				.build().generateScreen(parent);
