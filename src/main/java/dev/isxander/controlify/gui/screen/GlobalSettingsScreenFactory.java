@@ -21,12 +21,24 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class GlobalSettingsScreenFactory {
     public static Screen createGlobalSettingsScreen(Screen parent) {
         var globalSettings = Controlify.instance().config().getSettings().globalSettings();
         AtomicReference<ListOption<String>> whitelist = new AtomicReference<>();
+        AtomicReference<Option<String>> controllerSelector = new AtomicReference<>();
+
+        List<String> controllerUids = new ArrayList<>();
+        // Empty string represents "Keyboard & Mouse" or "No Preference"
+        controllerUids.add("");
+        Controlify.instance().getControllerManager().ifPresent(cm -> {
+            for (ControllerEntity c : cm.getConnectedControllers()) {
+                controllerUids.add(c.uid());
+            }
+        });
 
         boolean is12106OrLater = /*? if >=1.21.6 {*/ true /*?} else {*/ /*false *//*?}*/;;
 
@@ -179,6 +191,64 @@ public class GlobalSettingsScreenFactory {
                                             Minecraft.getInstance().keyboardHandler.setClipboard(formatted);
                                         })
                                         .build())
+                                .build())
+                        .group(OptionGroup.createBuilder()
+                                .name(Component.translatable("controlify.gui.controller_selection"))
+                                .option(Option.<Boolean>createBuilder()
+                                        .name(Component.translatable("controlify.gui.auto_switch_controllers"))
+                                        .description(OptionDescription.createBuilder()
+                                                .text(Component.translatable("controlify.gui.auto_switch_controllers.tooltip"))
+                                                .build())
+                                        .binding(GlobalSettings.defaults().autoSwitchControllers, () -> globalSettings.autoSwitchControllers, v -> globalSettings.autoSwitchControllers = v)
+                                        .controller(TickBoxControllerBuilder::create)
+                                        .addListener((opt, event) -> {
+                                            var selector = controllerSelector.get();
+                                            if (selector != null) selector.setAvailable(!opt.pendingValue());
+                                        })
+                                        .build())
+                                .option(() -> {
+                                    // Binding preferred controller UID.
+                                    // Empty string ("") maps to "Keyboard & Mouse" / No Lock.
+                                    var opt = Option.<String>createBuilder()
+                                            .name(Component.translatable("controlify.gui.preferred_controller"))
+                                            .description(OptionDescription.createBuilder()
+                                                    .text(Component.translatable("controlify.gui.preferred_controller.tooltip"))
+                                                    .build())
+                                            .binding(
+                                                    GlobalSettings.defaults().preferredControllerUid,
+                                                    () -> globalSettings.preferredControllerUid,
+                                                    uid -> {
+                                                        globalSettings.preferredControllerUid = uid;
+                                                        if (!globalSettings.autoSwitchControllers) {
+                                                            if (uid.isEmpty()) {
+                                                                Controlify.instance().setCurrentController(null, true);
+                                                            } else {
+                                                                Controlify.instance().getControllerManager().ifPresent(cm ->
+                                                                        cm.getConnectedControllers().stream()
+                                                                                .filter(c -> c.uid().equals(uid))
+                                                                                .findFirst()
+                                                                                .ifPresent(c -> Controlify.instance().setCurrentController(c, true)));
+                                                            }
+                                                        }
+                                                    }
+                                            )
+                                            .controller(o -> CyclingListControllerBuilder.create(o)
+                                                    .values(controllerUids)
+                                                    .formatValue(uid -> {
+                                                        if (uid.isEmpty()) return Component.translatable("controlify.gui.keyboard_mouse");
+                                                        return Controlify.instance().getControllerManager()
+                                                                .map(cm -> cm.getConnectedControllers().stream()
+                                                                        .filter(c -> c.uid().equals(uid))
+                                                                        .findFirst()
+                                                                        .map(c -> (Component) Component.literal(c.name()))
+                                                                        .orElse(Component.literal(uid)))
+                                                                .orElse(Component.literal(uid));
+                                                    }))
+                                            .available(!globalSettings.autoSwitchControllers)
+                                            .build();
+                                    controllerSelector.set(opt);
+                                    return opt;
+                                })
                                 .build())
                         .build())
                 .build().generateScreen(parent);
