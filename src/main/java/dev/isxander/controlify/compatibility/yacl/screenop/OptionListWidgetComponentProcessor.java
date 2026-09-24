@@ -34,12 +34,15 @@ public class OptionListWidgetComponentProcessor implements ComponentProcessor {
 			OptionListWidget.GroupSeparatorEntry nextGroup = findNextGroup(optionListWidget, up ? -1 : 1);
 			if (nextGroup != null) {
 				if (nextGroup.isExpanded()) {
-					var childEntries = ((GroupSeparatorEntryAccessor) nextGroup).getChildEntries();
-					if (!childEntries.isEmpty()) {
-						var childEntry = childEntries.get(0);
-						var buttonWithinChild = childEntry.children().get(0);
-						optionListWidget.setFocused(childEntries.get(0));
-						childEntry.setFocused(buttonWithinChild);
+					// focus the first child that has focusable buttons, or the child entry
+					// itself if it has none - e.g. an empty list group's EmptyListLabel
+					var childEntry = findFirstFocusableChild(nextGroup);
+					if (childEntry != null) {
+						var buttonsWithinChild = childEntry.children();
+						optionListWidget.setFocused(childEntry);
+						if (!buttonsWithinChild.isEmpty()) {
+							childEntry.setFocused(buttonsWithinChild.get(0));
+						}
 					} else {
 						optionListWidget.setFocused(nextGroup);
 					}
@@ -51,6 +54,16 @@ public class OptionListWidgetComponentProcessor implements ComponentProcessor {
 		}
 
 		return false;
+	}
+
+	private static @Nullable OptionListWidget.Entry findFirstFocusableChild(OptionListWidget.GroupSeparatorEntry group) {
+		List<OptionListWidget.Entry> childEntries = ((GroupSeparatorEntryAccessor) group).getChildEntries();
+		for (OptionListWidget.Entry child : childEntries) {
+			if (!child.children().isEmpty()) {
+				return child;
+			}
+		}
+		return childEntries.isEmpty() ? null : childEntries.get(0);
 	}
 
 	private static @Nullable OptionListWidget.GroupSeparatorEntry findNextGroup(OptionListWidget optionList, int direction) {
