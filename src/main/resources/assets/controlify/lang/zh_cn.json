@@ -244,6 +244,7 @@
   "controlify.toast.vmouse_unavailable.description": "此屏幕正在强制执行一个特定的虚拟鼠标模式，你无法改变它。",
   "controlify.toast.controller_connected.title": "控制器已连接",
   "controlify.toast.controller_connected.description": "名为“%s”的控制器已连接。已自动切换到该控制器。",
+  "controlify.toast.controller_connected.detected": "名为“%s”的控制器已连接。",
   "controlify.toast.controller_disconnected.title": "控制器已断开连接",
   "controlify.toast.controller_disconnected.description": "“%s”已断开连接。",
   "controlify.toast.profile.title": "档案错误",
