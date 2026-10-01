@@ -401,17 +401,8 @@ public abstract class SDLCommonDriver<SdlController> implements Driver {
 
 		String uid = CUtil.createUIDFromBytes(bytes.toArray(new byte[0][]));
 
-		String nonDuplicateUid = uid;
-		int duplicateCount = (int) Controlify.instance().getControllerManager().orElseThrow()
-				.getConnectedControllers()
-				.stream()
-				.filter(controller -> controller.uid().startsWith(nonDuplicateUid))
-				.count();
-		if (duplicateCount > 0) {
-			uid += "-" + duplicateCount;
-		}
-
-		return uid;
+		return ControllerUidAllocator.allocate(uid, Controlify.instance().getControllerManager().orElseThrow()
+				.getConnectedControllers().stream().map(ControllerEntity::uid).toList());
 	}
 
 	protected boolean isBluetooth() {

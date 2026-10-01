@@ -33,6 +33,7 @@ import dev.isxander.controlify.controller.input.ControllerStateView;
 import dev.isxander.controlify.controller.input.InputComponent;
 import dev.isxander.controlify.controller.rumble.RumbleComponent;
 import dev.isxander.controlify.controllermanager.ControllerManager;
+import dev.isxander.controlify.controllermanager.ControllerSelection;
 import dev.isxander.controlify.controllermanager.SDLControllerManager;
 import dev.isxander.controlify.driver.sdl.SDLNativesLoader;
 import dev.isxander.controlify.driver.steamdeck.SteamDeckMode;
@@ -368,12 +369,8 @@ public class Controlify implements ControlifyApi {
 
 		String selectedUid = config().getActiveProfile().controllerUid;
 		GlobalSettings globalSettings = config().getSettings().globalSettings();
-		if (selectedUid == null) {
-			// when auto-switching is disabled, only the preferred controller grabs focus on connection
-			if (globalSettings.autoSwitchControllers || controller.uid().equals(globalSettings.preferredControllerUid)) {
-				this.setCurrentController(controller, true);
-			}
-		} else if (selectedUid.equals(controller.uid())) {
+		if (ControllerSelection.acceptsConnection(controller.uid(), selectedUid,
+				globalSettings.autoSwitchControllers, globalSettings.preferredControllerUid)) {
 			this.setCurrentController(controller, true);
 		}
 
@@ -420,11 +417,11 @@ public class Controlify implements ControlifyApi {
 	 */
 	private void onControllerRemoved(ControllerEntity controller) {
 		if (this.getCurrentController().isPresent() && getCurrentController().get().equals(controller)) {
-			if (config().getActiveProfile().controllerUid == null) {
-				this.selectFirstConnectedController();
-			} else {
-				this.setCurrentController(null, true);
-			}
+			GlobalSettings settings = config().getSettings().globalSettings();
+			var selected = ControllerSelection.afterDisconnect(controllerManager.getConnectedControllers(),
+					ControllerEntity::uid, config().getActiveProfile().controllerUid,
+					settings.autoSwitchControllers, settings.preferredControllerUid);
+			this.setCurrentController(selected.orElse(null), true);
 		}
 
 		MinecraftUtil.sendToast(
@@ -432,13 +429,6 @@ public class Controlify implements ControlifyApi {
 				Component.translatable("controlify.toast.controller_disconnected.description", controller.name()),
 				false
 		);
-	}
-
-	private void selectFirstConnectedController() {
-		Optional<ControllerEntity> firstController = controllerManager.getConnectedControllers()
-				.stream()
-				.findFirst();
-		this.setCurrentController(firstController.orElse(null), true);
 	}
 
 	/**
@@ -585,23 +575,8 @@ public class Controlify implements ControlifyApi {
 		Optional<ControllerEntity> selected = Optional.empty();
 
 		if (controllerManager != null) {
-			if (selectedUid != null) {
-				// a locked profile stays in keyboard mode whilst its controller is disconnected
-				selected = controllerManager.getConnectedControllers().stream()
-						.filter(controller -> selectedUid.equals(controller.uid()))
-						.findFirst();
-			} else {
-				// with auto-switching disabled, the preferred controller takes priority
-				if (!globalSettings.autoSwitchControllers) {
-					selected = controllerManager.getConnectedControllers().stream()
-							.filter(controller -> controller.uid().equals(globalSettings.preferredControllerUid))
-							.findFirst();
-				}
-				// fall back to the first connected controller
-				if (selected.isEmpty()) {
-					selected = controllerManager.getConnectedControllers().stream().findFirst();
-				}
-			}
+			selected = ControllerSelection.resolve(controllerManager.getConnectedControllers(), ControllerEntity::uid,
+					selectedUid, globalSettings.autoSwitchControllers, globalSettings.preferredControllerUid);
 		}
 
 		this.setCurrentController(selected.orElse(null), changeInputMode);
@@ -666,7 +641,9 @@ public class Controlify implements ControlifyApi {
 		lastInputSwitchTime = Blaze3D.getTime();
 
 		if (!minecraft.mouseHandler.isMouseGrabbed()) {
-			if (newInputMode == InputMode.KEYBOARD_MOUSE && virtualMouseHandler().isVirtualMouseEnabled()) {
+			// A background controller disconnect must not warp the foreground player's cursor.
+			if (newInputMode == InputMode.KEYBOARD_MOUSE && virtualMouseHandler().isVirtualMouseEnabled()
+					&& minecraft.isWindowActive()) {
 				moveCursorToVirtualMouse();
 			}
 			hideMouse(newInputMode.isController(), true);
