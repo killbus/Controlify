@@ -260,6 +260,7 @@
   "controlify.toast.vmouse_unavailable.description": "This screen is forcing a specific virtual mouse mode and you cannot change it.",
   "controlify.toast.controller_connected.title": "Controller Connected",
   "controlify.toast.controller_connected.description": "A controller named `%s` has been connected. It has automatically been switched to.",
+  "controlify.toast.controller_connected.detected": "A controller named `%s` has been connected.",
   "controlify.toast.controller_disconnected.title": "Controller Disconnected",
   "controlify.toast.controller_disconnected.description": "'%s' was disconnected.",
   "controlify.toast.profile.title": "Profile Error",

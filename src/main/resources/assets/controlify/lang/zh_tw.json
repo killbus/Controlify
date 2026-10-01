@@ -194,6 +194,7 @@
   "controlify.toast.vmouse_unavailable.description": "這個螢幕正在強制使用特定的虛擬滑鼠模式，你無法更改它。",
   "controlify.toast.controller_connected.title": "控制器已連接",
   "controlify.toast.controller_connected.description": "名為「%s」的控制器已連接。它已自動切換為使用中。",
+  "controlify.toast.controller_connected.detected": "名為「%s」的控制器已連接。",
   "controlify.toast.controller_disconnected.title": "控制器已中斷連接",
   "controlify.toast.controller_disconnected.description": "「%s」中斷連接。",
   "controlify.toast.faulty_input.title": "停用控制器",

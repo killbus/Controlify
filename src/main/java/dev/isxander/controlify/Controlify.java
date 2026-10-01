@@ -395,10 +395,10 @@ public class Controlify implements ControlifyApi {
 				nextScreen -> new BluetoothWarningScreen(controller.bluetooth().orElseThrow(), nextScreen)
 		);
 
-		if (hotplugged) {
+		if (hotplugged && getCurrentController().filter(controller::equals).isPresent()) {
 			MinecraftUtil.sendToast(
 					Component.translatable("controlify.toast.controller_connected.title"),
-					Component.translatable("controlify.toast.controller_connected.description", controller.name()),
+					Component.translatable("controlify.toast.controller_connected.detected", controller.name()),
 					false
 			);
 		}
@@ -422,13 +422,13 @@ public class Controlify implements ControlifyApi {
 					ControllerEntity::uid, config().getActiveProfile().controllerUid,
 					settings.autoSwitchControllers, settings.preferredControllerUid);
 			this.setCurrentController(selected.orElse(null), true);
-		}
 
-		MinecraftUtil.sendToast(
-				Component.translatable("controlify.toast.controller_disconnected.title"),
-				Component.translatable("controlify.toast.controller_disconnected.description", controller.name()),
-				false
-		);
+			MinecraftUtil.sendToast(
+					Component.translatable("controlify.toast.controller_disconnected.title"),
+					Component.translatable("controlify.toast.controller_disconnected.description", controller.name()),
+					false
+			);
+		}
 	}
 
 	/**

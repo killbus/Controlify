@@ -68,6 +68,7 @@ public abstract class SDLCommonDriver<SdlController> implements Driver {
 	protected final boolean isDualsense;
 	protected final boolean isRGBLedSupported;
 
+	protected final SdlJoystickId joystickId;
 	protected final SdlGuid guid;
 	protected final String guidString;
 	protected final @Nullable String serial;
@@ -82,6 +83,7 @@ public abstract class SDLCommonDriver<SdlController> implements Driver {
 
 	public SDLCommonDriver(Sdl sdl, SdlController ptrController, SdlJoystickId jid, ControllerType type, ControlifyLogger logger) {
 		this.sdl = sdl;
+		this.joystickId = jid;
 		this.arena = Arena.ofConfined();
 
 		this.ptrController = ptrController;
@@ -372,6 +374,10 @@ public abstract class SDLCommonDriver<SdlController> implements Driver {
 	}
 
 	protected String createUid() {
+		Optional<String> nativeUid = ControllerIdentity.gameInputUid(this.guid.data()[14], this.serial,
+				sdl.joystick().SDL_GetJoystickPathForID(this.joystickId));
+		if (nativeUid.isPresent()) return nativeUid.get();
+
 		int identifiers = 0;
 		List<byte[]> bytes = new ArrayList<>();
 
